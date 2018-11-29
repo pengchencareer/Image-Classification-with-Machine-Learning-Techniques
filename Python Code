@@ -1,0 +1,716 @@
+#ONE: Import Related Packages
+
+import numpy as np
+import cv2
+import os
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from sklearn.ensemble import RandomForestClassifier#1
+from sklearn.linear_model import LogisticRegression#2
+from sklearn.tree import DecisionTreeClassifier#3
+from sklearn.neighbors import KNeighborsClassifier#4
+from sklearn.svm import SVC
+from sklearn.grid_search import GridSearchCV
+from random import shuffle
+import keras
+import tensorflow as tf
+#from tqdm import tqdm
+#tensorflow CNN#6
+from sklearn.metrics import confusion_matrix,precision_recall_fscore_support
+from sklearn.metrics import classification_report
+import pandas as pd
+import pickle
+import matplotlib.pyplot as plt
+import seaborn as sns
+from mpl_toolkits.mplot3d import Axes3D
+from sklearn import preprocessing
+from sklearn.decomposition import PCA  #Principal Component Analysis
+%matplotlib inline
+
+
+
+
+#TWO: Load Dataset Converted Images to Values. 
+
+
+#1. METHOD 1: USING OPENCV RGB CHANNEL. 
+
+#a. Dataset 1 from Kaggle Fruit 360 and, Features(256) and Observations
+
+output_dir='output'
+if not os.path.exists(output_dir):
+    os.mkdir(output_dir)
+img_dir = './Downloads/fruits/fruits-360/Training'
+images=[]
+labels=[]
+for fname in os.listdir(img_dir):
+    
+    ap = os.path.join(img_dir,fname) #absolute path of folders
+    for fname2 in os.listdir(ap): #fname2: image names
+        fname3=os.path.join(ap,fname2) #absolute path of images
+        img=cv2.imread(fname3)
+        #split(img, 0.2, 5, 'patch')
+        images.append(img)
+        labels.append(fname)  
+label_encoder = LabelEncoder()
+y = label_encoder.fit_transform(labels)
+train_idx,test_idx = train_test_split(range(len(y)),test_size=0.2,stratify = y, random_state = 1234)  
+train_y = y[train_idx]
+test_y = y[test_idx]
+
+#b. Dataset 2: Tropical Fruits
+
+output_dir='output'
+if not os.path.exists(output_dir):
+    os.mkdir(output_dir)
+img_dir = './Downloads/tropical-fruits-DB-1024x768/tropical-fruits-DB-1024x768'
+images=[]
+labels=[]
+for fname in os.listdir(img_dir):
+    print(fname)
+    ap = os.path.join(img_dir,fname) #absolute path of folders
+    for fname2 in os.listdir(ap): #fname2: image names
+        fname3=os.path.join(ap,fname2) #absolute path of images
+        img=cv2.imread(fname3)
+        images.append(img)
+        labels.append(fname)
+label_encoder = LabelEncoder()
+y = label_encoder.fit_transform(labels)
+train_idx,test_idx = train_test_split(range(len(y)),test_size=0.2,stratify = y, random_state = 1234) 
+train_y = y[train_idx]
+test_y = y[test_idx]
+
+#c. Dataset 3 from FIDS30 with Different Image Sizeds
+
+output_dir='output'
+if not os.path.exists(output_dir):
+    os.mkdir(output_dir)
+img_dir = './Downloads/dataset3/FIDS30'
+images=[]
+labels=[]
+sum=0
+for fname in os.listdir(img_dir):
+    ap = os.path.join(img_dir,fname) #absolute path of folders
+    for fname2 in os.listdir(ap): #fname2: image names
+        #print(fname2)
+        fname3=os.path.join(ap,fname2) #absolute path of images
+        #print(fname3)
+        img=cv2.imread(fname3)
+        img2=cv2.resize(img,(100,100),interpolation = cv2.INTER_CUBIC)
+        #split(img, 0.2, 5, 'patch')
+        #print(img)
+        images.append(img2)
+        labels.append(fname)
+label_encoder = LabelEncoder()
+y = label_encoder.fit_transform(labels)
+train_idx,test_idx = train_test_split(range(len(y)),test_size=0.2,stratify = y, random_state = 1234) 
+train_y = y[train_idx]
+test_y = y[test_idx]
+
+#d. Each Chanel Is Divided into 8 Groups
+
+def transform(img):
+    hist = cv2.calcHist([img],[0,1,2],None,[8]*3,[0,256]*3)
+    return hist.ravel()
+x_rgb = np.row_stack([transform(img) for img in images])
+train_x = x_rgb[train_idx]
+test_x = x_rgb[test_idx]
+
+
+#2. METHOD 2: READ IMAGES DIRECTLY
+
+#a. Dataset 1, Features(30000) and Observations
+
+output_dir='output'
+if not os.path.exists(output_dir):
+    os.mkdir(output_dir)
+img_dir = './Downloads/fruits/fruits-360/Training'
+images=[]
+labels=[]
+for fname in os.listdir(img_dir):
+    
+    ap = os.path.join(img_dir,fname) #absolute path of folders
+    for fname2 in os.listdir(ap): #fname2: image names
+        fname3=os.path.join(ap,fname2) #absolute path of images
+        img=cv2.imread(fname3)
+        images.append(img.ravel())
+        labels.append(fname)
+label_encoder = LabelEncoder()
+y = label_encoder.fit_transform(labels)             #y: Labels
+x_rgb = np.row_stack(img for img in images)         #x: Independent Values
+
+#b. PCA Method: N=5
+
+pca=PCA(n_components=5)
+prin=pca.fit_transform(x_rgb)
+
+#c. Normalization
+
+nor=preprocessing.normalize(x_rgb) 
+
+#d. Standardization
+
+std=preprocessing.scale(x_rgb) 
+
+#e. Spliting Dataset into Two Parts Based on Their Index
+
+train_idx,test_idx = train_test_split(range(len(y)),test_size=0.2, stratify=y, random_state = 12345)    
+train_y = y[train_idx]
+test_y = y[test_idx]
+train_x = x_rgb[train_idx,:]
+test_x = x_rgb[test_idx,:]
+
+
+
+
+#THREE: Calculate the Number of Observations for Each Class of Dataset 1
+
+count=[]
+for i in range(81):
+    count.append('0')
+count=list(map(int,count))
+for i in y:
+    if i==0:
+        count[0]=count[0]+1
+    elif i==1:
+        count[1]=count[1]+1
+    elif i==2:
+        count[2]=count[2]+1
+    elif i==3:
+        count[3]=count[3]+1
+    elif i==4:
+        count[4]=count[4]+1
+    elif i==5:
+        count[5]=count[5]+1
+    elif i==6:
+        count[6]=count[6]+1
+    elif i==7:
+        count[7]=count[7]+1
+    elif i==8:
+        count[8]=count[8]+1
+    elif i==9:
+        count[9]=count[9]+1
+    elif i==10:
+        count[10]=count[10]+1
+    elif i==11:
+        count[11]=count[11]+1
+    elif i==12:
+        count[12]=count[12]+1
+    elif i==13:
+        count[13]=count[13]+1
+    elif i==14:
+        count[14]=count[14]+1
+    elif i==15:
+        count[15]=count[15]+1
+    elif i==16:
+        count[16]=count[16]+1
+    elif i==17:
+        count[17]=count[17]+1
+    elif i==18:
+        count[18]=count[18]+1
+    elif i==19:
+        count[19]=count[19]+1
+    elif i==20:
+        count[20]=count[20]+1
+    elif i==21:
+        count[21]=count[21]+1
+    elif i==22:
+        count[22]=count[22]+1
+    elif i==23:
+        count[23]=count[23]+1
+    elif i==24:
+        count[24]=count[24]+1
+    elif i==25:
+        count[25]=count[25]+1
+    elif i==26:
+        count[26]=count[26]+1
+    elif i==27:
+        count[27]=count[27]+1
+    elif i==28:
+        count[28]=count[28]+1
+    elif i==29:
+        count[29]=count[29]+1
+    elif i==30:
+        count[30]=count[30]+1
+    elif i==31:
+        count[31]=count[31]+1
+    elif i==32:
+        count[32]=count[32]+1
+    elif i==33:
+        count[33]=count[33]+1
+    elif i==34:
+        count[34]=count[34]+1
+    elif i==35:
+        count[35]=count[35]+1
+    elif i==36:
+        count[36]=count[36]+1
+    elif i==37:
+        count[37]=count[37]+1
+    elif i==38:
+        count[38]=count[38]+1
+    elif i==39:
+        count[39]=count[39]+1
+    elif i==40:
+        count[40]=count[40]+1
+    elif i==41:
+        count[41]=count[41]+1
+    elif i==42:
+        count[42]=count[42]+1
+    elif i==43:
+        count[43]=count[43]+1
+    elif i==44:
+        count[44]=count[44]+1
+    elif i==45:
+        count[45]=count[45]+1
+    elif i==46:
+        count[46]=count[46]+1
+    elif i==47:
+        count[47]=count[47]+1
+    elif i==48:
+        count[48]=count[48]+1
+    elif i==49:
+        count[49]=count[49]+1
+    elif i==50:
+        count[50]=count[50]+1
+    elif i==51:
+        count[51]=count[51]+1
+    elif i==52:
+        count[52]=count[52]+1
+    elif i==53:
+        count[53]=count[53]+1
+    elif i==54:
+        count[54]=count[54]+1
+    elif i==55:
+        count[55]=count[55]+1
+    elif i==56:
+        count[56]=count[56]+1
+    elif i==57:
+        count[57]=count[57]+1
+    elif i==58:
+        count[58]=count[58]+1
+    elif i==59:
+        count[59]=count[59]+1
+    elif i==60:
+        count[60]=count[60]+1
+    elif i==61:
+        count[61]=count[61]+1
+    elif i==62:
+        count[62]=count[62]+1
+    elif i==63:
+        count[63]=count[63]+1
+    elif i==64:
+        count[64]=count[64]+1
+    elif i==65:
+        count[65]=count[65]+1
+    elif i==66:
+        count[66]=count[66]+1
+    elif i==67:
+        count[67]=count[67]+1
+    elif i==68:
+        count[68]=count[68]+1
+    elif i==69:
+        count[69]=count[69]+1
+    elif i==70:
+        count[70]=count[70]+1
+    elif i==71:
+        count[71]=count[71]+1
+    elif i==72:
+        count[72]=count[72]+1
+    elif i==73:
+        count[73]=count[73]+1
+    elif i==74:
+        count[74]=count[74]+1
+    elif i==75:
+        count[75]=count[75]+1
+    elif i==76:
+        count[76]=count[76]+1
+    elif i==77:
+        count[77]=count[77]+1
+    elif i==78:
+        count[78]=count[78]+1
+    elif i==79:
+        count[79]=count[79]+1
+    else:
+        count[80]=count[80]+1
+
+
+
+
+#FOUR: Distribution of Number of ObservationS in Each Class of Dataset 1
+
+plt.figure(figsize=(10,5))
+plt.plot(range(81),count,color='blue',linestyle='--',marker='o',markerfacecolor='red',markersize=5)
+plt.title('Category Distribution')
+plt.xlabel('Category Number')
+plt.ylabel('Number of Each Category')
+#save model for later use
+def save_model(model,label_encoder,output_file):
+    try:
+        with open(output_file,'wb') as outfile:
+            pickle.dump({
+                'model':model,
+                'label_encoder':label_encoder
+            },outfile)
+        return True
+    except:
+        return False
+        
+        
+        
+        
+#FIVE: Define Evaluation Function
+
+def eval_model(y_true,y_pred,labels):
+    P,r,f1,s =precision_recall_fscore_support(y_true,y_pred)
+    tot_P = np.average(P,weights =s)
+    tot_r = np.average(r,weights =s)
+    tot_f1 = np.average(f1,weights =s)
+    tot_s = np.sum(s)
+    res1 = pd.DataFrame({
+        'Label':labels,
+        'Precision':P,
+        'Reacll':r,
+        'F1':f1,
+        'Support':s
+    })
+    res2 = pd.DataFrame({
+        'Label':['Total'],
+        'Precision':[tot_P],
+        'Recall':[tot_r],
+        'F1':[tot_f1],
+        'Support':[tot_s]
+    })
+    res2.index=[999]
+    res = pd.concat([res1,res2])
+    conf_mat = pd.DataFrame(confusion_matrix(y_true,y_pred),columns=labels,index=labels)
+    return conf_mat,res[['Label','Precision','Recall','F1','Support']]
+  
+  
+  
+  
+#SIX: Analyze Relationships among Features
+
+feature_0_0=[]
+feature_0_1=[]
+feature_0_2=[]
+feature_1_0=[]
+feature_1_1=[]
+feature_1_2=[]
+feature_2_0=[]
+feature_2_1=[]
+feature_2_2=[]
+for i in range(492):                    #1st class: Apple Braeburn
+    feature_0_0.append(x_rgb[i][7575])  #feature 7575
+feature_0_0=list(map(int,feature_0_0))
+for i in range(492):
+    feature_0_1.append(x_rgb[i][15000]) #feature 15000
+feature_0_1=list(map(int,feature_0_1))
+for i in range(492):
+    feature_0_2.append(x_rgb[i][22725]) #feature 22725
+feature_0_2=list(map(int,feature_0_2))
+for i in range(9690,10428):             #20th class: cherry1
+    feature_1_0.append(x_rgb[i][7575])  #feature 7575
+feature_1_0=list(map(int,feature_1_0))
+for i in range(9690,10428):
+    feature_1_1.append(x_rgb[i][15000]) #feature 15000
+feature_1_1=list(map(int,feature_1_1))
+for i in range(9690,10428):
+    feature_1_2.append(x_rgb[i][22725]) #feature 22725
+feature_1_2=list(map(int,feature_1_2))
+for i in range(40587,41321):            #81st class: Walnut
+    feature_2_0.append(x_rgb[i][7575])  #feature 7575
+feature_2_0=list(map(int,feature_2_0))
+for i in range(40587,41321):
+    feature_2_1.append(x_rgb[i][15000]) #feature 15000
+feature_2_1=list(map(int,feature_2_1))
+for i in range(40587,41321):
+    feature_2_2.append(x_rgb[i][22725]) #feature 22725
+feature_2_2=list(map(int,feature_2_2))
+  
+  
+  
+  
+#SEVEN: Distribution of 2-D Original Dataset 1 with Random 3 Classes in Feature 15000 and Feature 22725
+
+plt.figure(1,figsize=(8,6))
+axScatter=plt.axes([0.1,0.1,0.65,0.65])
+axScatter.scatter(feature_0_1,feature_0_2,s=20, label='Apple Braeburn')
+axScatter.scatter(feature_1_1,feature_1_2,s=20, color='red', label='Cherry 1')
+axScatter.scatter(feature_2_1,feature_2_2,s=20, color='green', label='Walnut')
+axScatter.legend()
+plt.xlabel('Feature 15000')
+plt.ylabel('Feature 22725')
+
+
+
+
+#EIGHT: Distribution of 3-D Original Dataset with Random 3 Classes in Feature 7575, Feature 15000 and Feature 22725
+
+fig=plt.figure(1, figsize=(10,8))
+ax=fig.add_subplot(111, projection='3d')
+ax.scatter(feature_0_0, feature_0_1, feature_0_2, c='b', label='Apple Braeburn')
+ax.scatter(feature_1_0, feature_1_1, feature_1_2, c='r', label='Cherry 1')
+ax.scatter(feature_2_0, feature_2_1, feature_2_2, c='g', label='Walnut')
+ax.legend()
+ax.set_xlabel('Feature 7575')
+ax.set_ylabel('Feature 15000')
+ax.set_zlabel('Feature 22725')
+ax.set_title('Scatter-3D')
+
+
+
+
+#NINE: Normalization Analysis
+
+nor_0_0=preprocessing.normalize([feature_0_0])
+nor_0_1=preprocessing.normalize([feature_0_1])
+nor_0_2=preprocessing.normalize([feature_0_2])
+nor_1_0=preprocessing.normalize([feature_1_0])
+nor_1_1=preprocessing.normalize([feature_1_1])
+nor_1_2=preprocessing.normalize([feature_1_2])
+nor_2_0=preprocessing.normalize([feature_2_0])
+nor_2_1=preprocessing.normalize([feature_2_1])
+nor_2_2=preprocessing.normalize([feature_2_2])
+  
+  
+  
+  
+#TEN: Distribution of 2-D Normalized Dataset with Random 3 Classes in Feature 15000 and Feature 22725
+
+plt.figure(1,figsize=(8,6))
+axScatter=plt.axes([0.1,0.1,0.65,0.65])
+axScatter.scatter(nor_0_1[0],nor_0_2[0],s=20, label='Apple Braeburn')
+axScatter.scatter(nor_1_1[0],nor_1_2[0],s=20, color='red', label='Cherry 1')
+axScatter.scatter(nor_2_1[0],nor_2_2[0],s=20, color='green', label='Walnut')
+axScatter.legend()
+plt.xlabel('Feature 15000')
+plt.ylabel('Feature 22725')
+plt.title('Normalized Scatter-2D')
+  
+  
+  
+  
+#ELEVEN: Distribution of 3-D Normalized Dataset with Random 3 Classes in Feature 7575, Feature 15000 and Feature 22725
+
+fig=plt.figure(1, figsize=(10,8))
+ax=fig.add_subplot(111, projection='3d')
+ax.scatter(nor_0_0, nor_0_1, nor_0_2, c='b', label='Apple Braeburn')
+ax.scatter(nor_1_0, nor_1_1, nor_1_2, c='r', label='Cherry 1')
+ax.scatter(nor_2_0, nor_2_1, nor_2_2, c='g', label='Walnut')
+ax.legend()
+ax.set_xlabel('Feature 7575')
+ax.set_ylabel('Feature 15000')
+ax.set_zlabel('Feature 22725')
+ax.set_title('Normalized Scatter-3D')
+
+
+
+
+#TWELVE: Standardization Analysis
+
+std_0_0=preprocessing.scale([feature_0_0])
+std_0_1=preprocessing.scale([feature_0_1])
+std_0_2=preprocessing.scale([feature_0_2])
+std_1_0=preprocessing.scale([feature_1_0])
+std_1_1=preprocessing.scale([feature_1_1])
+std_1_2=preprocessing.scale([feature_1_2])
+std_2_0=preprocessing.scale([feature_2_0])
+std_2_1=preprocessing.scale([feature_2_1])
+std_2_2=preprocessing.scale([feature_2_2])
+
+
+
+
+#THIRTEEN: Distribution of Standardized Dataset with Random 3 Classes in Feature 15000 and Feature 22725
+
+plt.figure(1,figsize=(8,6))
+axScatter=plt.axes([0.1,0.1,0.65,0.65])
+axScatter.scatter(std_0_1,std_0_2,s=20, label='Apple Braeburn')
+axScatter.scatter(std_1_1,std_1_2,s=20, color='red', label='Cherry 1')
+axScatter.scatter(std_2_1,std_2_2,s=20, color='green', label='Walnut')
+axScatter.legend()
+plt.xlabel('Feature 15000')
+plt.ylabel('Feature 22725')
+plt.title('Standardized Scatter-2D')
+  
+  
+  
+  
+#FOURTEEN: Distribution of 3-D Standardized Dataset with Random 3 Classes in Feature 7575, Feature 15000 and Feature 22725
+
+fig=plt.figure(1, figsize=(10,8))
+ax=fig.add_subplot(111, projection='3d')
+ax.scatter(std_0_0, std_0_1, std_0_2, c='b', label='Apple Braeburn')
+ax.scatter(std_1_0, std_1_1, std_1_2, c='r', label='Cherry 1')
+ax.scatter(std_2_0, std_2_1, std_2_2, c='g', label='Walnut')
+ax.legend()
+ax.set_xlabel('Feature 7575')
+ax.set_ylabel('Feature 15000')
+ax.set_zlabel('Feature 22725')
+ax.set_title('Standardized Scatter-3D')
+  
+  
+  
+  
+#FIFTEEN: Scatterplot of Each Class in Different Features
+
+x0=feature_0_1[0] #class 1: feature 15000
+y0=feature_0_2[0] #class 1: feature 22725
+x1=feature_1_1[0] #class 2: feature 15000
+y1=feature_1_2[0] #class 2: feature 22725
+x2=feature_2_1[0] #class 3: feature 15000
+y2=feature_2_2[0] #class 3: feature 22725
+# definitions for the axes
+left, width = 0.1, 0.65
+bottom, height = 0.1, 0.65
+bottom_h = left_h = left + width + 0.02
+rect_scatter = [left, bottom, width, height]
+rect_histx = [left, bottom_h, width, 0.2]
+rect_histy = [left_h, bottom, 0.2, height]
+# start with a rectangular Figure
+plt.figure(1, figsize=(7, 7))
+axScatter = plt.axes(rect_scatter)
+axHistx = plt.axes(rect_histx)
+axHisty = plt.axes(rect_histy)
+# the scatter plot:
+axScatter.scatter(x2, y2, s=20,color='g')
+axScatter.set_xlabel('Feature 15000')
+axScatter.set_ylabel('Feature 22725')
+axHistx.hist(x2, bins=20,color='g')
+axHistx.set_title('Walnut')
+axHisty.hist(y2, bins=20, color='g', orientation='horizontal')
+axHistx.set_xlim(axScatter.get_xlim())
+axHisty.set_ylim(axScatter.get_ylim())
+plt.show()
+  
+  
+  
+  
+#SIXTEEN: Decision Tree training process
+
+model_rgb_dt=DecisionTreeClassifier()
+model_rgb_dt.fit(train_x,train_y)
+save_model(model_rgb_dt,label_encoder,os.path.join(output_dir,'model_rgb_dt.pkl'))
+y_pred_rgb_dt = model_rgb_dt.predict(test_x)
+conf_mat_lab_dt,evalues_dt = eval_model(test_y,y_pred_rgb_dt,label_encoder.classes_)
+print(conf_mat_lab_dt)
+print(evalues_dt)
+
+
+
+
+#SEVENTEEN: Random Forest Training Process
+
+model_rgb_rf = RandomForestClassifier(n_estimators =25, max_depth =15, random_state=1234) # 1234随机初始化的种子
+model_rgb_rf.fit(train_x,train_y) 
+save_model(model_rgb_rf,label_encoder,os.path.join(output_dir,'model_rgb_rf.pkl'))
+y_pred_rgb_rf = model_rgb_rf.predict(test_x)
+conf_mat_lab_rf,evalues_rf = eval_model(test_y,y_pred_rgb_rf,label_encoder.classes_)
+print(conf_mat_lab_rf)
+print(evalues_rf)
+
+
+
+
+#EIGHTEEN: Logistic Regression Training Process
+
+model_rgb_lr = LogisticRegression(penalty ='l2',C=1,random_state=1234) 
+model_rgb_lr.fit(train_x,train_y)
+save_model(model_rgb_lr,label_encoder,os.path.join(output_dir,'model_rgb_lr.pkl'))
+y_pred_rgb_lr = model_rgb_lr.predict(test_x)
+conf_mat_rgb_lr,evalues_rgb_lr = eval_model(test_y,y_pred_rgb_lr,label_encoder.classes_)
+print(conf_mat_rgb_lr)
+print(evalues_rgb_lr)
+
+
+
+
+#NINETEEN: KNN: Relation between K Value and Error Rate
+
+error_rate=[]
+for i in range(1,30):
+    model_rgb_knn=KNeighborsClassifier(n_neighbors=i)
+    model_rgb_knn.fit(train_x,train_y)
+    y_pred_rgb_knn = model_rgb_knn.predict(test_x)
+    error_rate.append(np.mean(y_pred_rgb_knn!=test_y))
+plt.figure(figsize=(10,6))
+plt.plot(range(1,30),error_rate,color='blue',linestyle='--',marker='o',markerfacecolor='red',markersize=10)
+plt.title('Error Rate vs K')
+plt.xlabel('K')
+plt.ylabel('error Rate')
+
+
+
+
+#TWENTY: KNN Training Process
+
+model_rgb_knn=KNeighborsClassifier(n_neighbors=2)
+model_rgb_knn.fit(train_x,train_y)
+save_model(model_rgb_knn,label_encoder,os.path.join(output_dir,'model_rgb_knn.pkl'))
+y_pred_rgb_knn = model_rgb_knn.predict(test_x)
+conf_mat_lab_knn,evalues_knn = eval_model(test_y,y_pred_rgb_knn,label_encoder.classes_)
+print(conf_mat_lab_knn)
+print(evalues_knn)
+
+
+
+
+#TWENTY-ONE: Store Accuracy of KNN
+
+pre_knn=[]
+for i in range(81):
+    pre_knn.append('0')
+pre_knn=list(map(int,pre_knn))
+for i in range(81):
+    pre_knn[i]=evalues_knn['Precision'][i]
+
+
+
+
+#TWENTY-TWO: Store Accuracy of Decision Tree
+
+pre_dt=[]
+for i in range(81):
+    pre_dt.append('0')
+pre_dt=list(map(int,pre_dt))
+for i in range(81):
+    pre_dt[i]=evalues_dt['Precision'][i]
+    
+    
+    
+    
+#TWENTY-THREE: Store Accuracy of Random Forest
+
+pre_rf=[]
+for i in range(81):
+    pre_rf.append('0')
+pre_rf=list(map(int,pre_rf))
+for i in range(81):
+    pre_rf[i]=evalues_rf['Precision'][i]
+    
+    
+    
+    
+#TWENTY-FOUR: Store Accuracy of Logistic Regression
+
+pre_lr=[]
+for i in range(81):
+    pre_lr.append('0')
+pre_lr=list(map(int,pre_lr))
+for i in range(81):
+    pre_lr[i]=evalues_rgb_lr['Precision'][i]
+    
+    
+    
+    
+#TWENTY-FIVE: Plot for Different Methods of Manipulation of Dataset or Different Techniques or Different Dataset
+
+plt.figure(figsize=(12,6))
+plt.plot(range(81),pre_knn,color='blue',linestyle='--',label='KNN with PCA')
+plt.plot(range(81),pre_dt,color='red',linestyle='-',label='DT with PCA')
+plt.plot(range(81),pre_rf,color='green',linestyle='-.',label='RF with PCA')
+plt.plot(range(81),pre_lr,color='magenta',linestyle='-',label='LR with PCA')
+plt.title('Precision with Dimension-Reduction(PCA) among Techniques')
+plt.xlabel('Class Number')
+plt.ylabel('Precision')
+plt.legend()
