@@ -1,4 +1,4 @@
 # Image-Classification-with-Machine-Learning-Techniques
-This is my graduate project with Python, where I converted images into real data, cleaned the data, extracted the features and analyzed data with different machine learning techniques, including decision tree, random forest, logistic regression and K Nearest Neighbors techniques. Finally, I improved the accuracy of fruit image classification up to 98 %.
+This is my graduation project, where I converted > 10,000 fruit images into numeric data with OpenCV in Python to discover the optimal Machine Learning (ML) technique on fruit image classification. Untimately, I developed an optimal model, which improved classification accuracy up to 96.7%.
 
 The paper is almost ready to be published. The current version is ready to view. 
